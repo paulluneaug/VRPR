@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 
+using TMPro;
+
 using UnityEngine;
 
 using UnityUtility.CustomAttributes;
@@ -40,6 +42,9 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
 
     [Title("Audio")]
     [SerializeField] private AudioSource m_musicSource;
+    
+    [Title("UI")]
+    [SerializeField] private TextMeshProUGUI m_textUI;
      
     // Cache
     [NonSerialized] private GameState m_currentGameState;
@@ -117,6 +122,7 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
     {
         m_musicSource.Stop();
         m_currentGameState = GameState.Reaction;
+        m_textUI.text = "SIT";
         m_reactionTimer.Start();
     }
 
@@ -130,6 +136,7 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
 
         if (m_playerInput.SitInput)
         {
+            m_textUI.text = "WELL SITTED";
             StartNewRound();
         }
     }
@@ -168,12 +175,14 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
         m_currentPlayerAngle = 0.0f;
 
         m_currentGameState = GameState.Running;
+        m_textUI.text = "RUN";
 
         m_musicSource.Play();
     }
 
     private void LoseGame()
     {
+        m_textUI.text = "GAME OVER";
         Debug.LogError($"Game Lost");
     }
 }
