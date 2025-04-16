@@ -12,12 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 740f51a1ac4b42088297287229057627, type: 3}
   m_Name: MovingPose
   m_EditorClassIdentifier: 
-  m_HandShape: {fileID: 11400000, guid: 1fc1df6c6dda7794d96766d156a8371f, type: 2}
+  m_HandShape: {fileID: 11400000, guid: 73f136623d8fc8e4db3816fd7565274f, type: 2}
   m_RelativeOrientation:
-    m_UserConditions:
-    - m_HandAxis: 0
-      m_AlignmentCondition: 0
-      m_ReferenceDirection: 0
-      m_AngleTolerance: 20
-      m_IgnorePositionY: 0
+    m_UserConditions: []
     m_TargetConditions: []
