@@ -3,21 +3,26 @@ using System.Collections.Generic;
 
 using TMPro;
 
+using UnityEditor;
+
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 using UnityUtility.CustomAttributes;
 using UnityUtility.Extensions;
 using UnityUtility.MathU;
 using UnityUtility.Pools;
-using UnityUtility.Singletons;
 using UnityUtility.Timer;
 
-public class GameManager : MonoBehaviourSingleton<GameManager>
+public class GameManager : MonoBehaviour
 {
     private enum GameState
     {
+        WaitingInput,
         Running,
         Reaction,
+        Finished,
     }
 
     [Title("Chairs")]
@@ -26,6 +31,7 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
     [Separator]
     [SerializeField] private Transform m_chairParent;
     [SerializeField] private ChairPool m_chairPool;
+    [SerializeField] private AgentPool m_agentPool;
 
     [Title("Rounds")]
     [SerializeField] private Vector2 m_startRoundDurationRange;
@@ -42,14 +48,18 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
 
     [Title("Audio")]
     [SerializeField] private AudioSource m_musicSource;
-    
+
     [Title("UI")]
-    [SerializeField] private TextMeshProUGUI m_textUI;
-     
+    [SerializeField] private TextMeshProUGUI m_gameStateText;
+    [SerializeField] private Button m_quitButton;
+    [SerializeField] private Button m_restartButton;
+    [SerializeField] private RectTransform m_vignettes;
+
     // Cache
     [NonSerialized] private GameState m_currentGameState;
 
     [NonSerialized] private List<PooledObject<Transform>> m_chairs;
+    [NonSerialized] private List<PooledObject<Agent>> m_agents;
     [NonSerialized] private int m_currentRound;
 
     [NonSerialized] private Timer m_roundTimer;
@@ -59,16 +69,23 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
     [NonSerialized] private float m_currentPlayerSpeed;
     [NonSerialized] private float m_currentPlayerAngle;
 
-    protected override void Start()
+    protected void Start()
     {
-        base.Start();
         m_chairs = new List<PooledObject<Transform>>();
+        m_agents = new List<PooledObject<Agent>>();
 
         m_roundTimer = new Timer(0.0f, false);
         m_reactionTimer = new Timer(0.0f, false);
         m_motionlessTimer = new Timer(m_motionlessTime, false);
 
         m_currentRound = -1;
+
+        m_quitButton.onClick.AddListener(OnQuitButtonClicked);
+        m_restartButton.onClick.AddListener(OnRestartButtonClicked);
+
+        m_musicSource.Play();
+
+        m_vignettes.gameObject.SetActive(false);
 
         StartNewRound();
     }
@@ -77,12 +94,29 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
     {
         Action<float> updateStateAction = m_currentGameState switch
         {
+            GameState.WaitingInput => UpdateWaitInputState,
             GameState.Running => UpdateRunningState,
             GameState.Reaction => UpdateReactionState,
+            GameState.Finished => UpdateFinishedState,
             _ => throw new IndexOutOfRangeException(),
         };
 
         updateStateAction(Time.deltaTime);
+    }
+
+    private void OnDestroy()
+    {
+
+        m_quitButton.onClick.RemoveListener(OnQuitButtonClicked);
+        m_restartButton.onClick.RemoveListener(OnRestartButtonClicked);
+    }
+
+    private void UpdateWaitInputState(float deltaTime)
+    {
+        if (m_playerInput.MoveInput)
+        {
+            m_currentGameState = GameState.Running;
+        }
     }
 
     private void UpdateRunningState(float deltaTime)
@@ -90,6 +124,7 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
         if (m_roundTimer.Update(deltaTime))
         {
             StartReactionState();
+            m_vignettes.gameObject.SetActive(false);
             return;
         }
 
@@ -103,6 +138,8 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
             {
                 LoseGame();
             }
+
+            m_vignettes.gameObject.SetActive(false);
             return;
         }
         m_motionlessTimer.Stop();
@@ -110,19 +147,20 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
         m_currentPlayerAngle += MathUf.TAU * deltaTime * m_currentPlayerSpeed;
         float radius = m_playerRailDistance + m_chairCircleRadius;
 
-        m_playerContainer.transform.localPosition = new Vector3(
+        m_playerContainer.localPosition = new Vector3(
             MathUf.Cos(m_currentPlayerAngle) * radius,
             0.0f,
             MathUf.Sin(m_currentPlayerAngle) * radius);
 
-        m_playerContainer.LookAt(m_playerContainer.parent.transform.position, Vector3.up);
+        m_playerContainer.LookAt(m_playerContainer.parent.position, Vector3.up);
+        m_vignettes.gameObject.SetActive(true);
     }
 
     private void StartReactionState()
     {
-        m_musicSource.Stop();
+        m_musicSource.Pause();
         m_currentGameState = GameState.Reaction;
-        m_textUI.text = "SIT";
+        m_gameStateText.text = "SIT";
         m_reactionTimer.Start();
     }
 
@@ -136,9 +174,13 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
 
         if (m_playerInput.SitInput)
         {
-            m_textUI.text = "WELL SITTED";
+            m_gameStateText.text = "WELL SITTED";
             StartNewRound();
         }
+    }
+
+    private void UpdateFinishedState(float deltaTime)
+    {
     }
 
     private void StartNewRound()
@@ -155,6 +197,12 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
         int chairCount = m_startChairCount - m_currentRound;
         m_chairs.ForEach(chair => chair.Release());
         m_chairs.Clear();
+
+        if (chairCount == 0)
+        {
+            WinGame();
+            return;
+        }
 
         for (int iChair = 0; iChair < chairCount; ++iChair)
         {
@@ -174,15 +222,46 @@ public class GameManager : MonoBehaviourSingleton<GameManager>
         m_currentPlayerSpeed = m_startPlayerSpeed * MathUf.Pow(m_playerSpeedMultiplier, m_currentRound);
         m_currentPlayerAngle = 0.0f;
 
-        m_currentGameState = GameState.Running;
-        m_textUI.text = "RUN";
+        m_currentGameState = GameState.WaitingInput;
+        m_gameStateText.text = "RUN";
 
-        m_musicSource.Play();
+        m_musicSource.UnPause();
+    }
+
+    private void WinGame()
+    {
+        m_gameStateText.text = "GAME WON !";
+        m_currentGameState = GameState.Finished;
     }
 
     private void LoseGame()
     {
-        m_textUI.text = "GAME OVER";
+        m_gameStateText.text = "GAME OVER";
+        m_currentGameState = GameState.Finished;
         Debug.LogError($"Game Lost");
+    }
+
+    private void OnRestartButtonClicked()
+    {
+        Restart();
+    }
+
+    private void OnQuitButtonClicked()
+    {
+        Quit();
+    }
+
+    public void Restart()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void Quit()
+    {
+#if UNITY_EDITOR
+        EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 }

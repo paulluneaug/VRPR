@@ -1,5 +1,3 @@
-using System;
-
 using UnityEngine;
 using UnityEngine.XR.Hands.Samples.GestureSample;
 
@@ -7,8 +5,8 @@ using UnityUtility.CustomAttributes;
 
 public class PlayerHandInput : MonoBehaviour
 {
-    public bool MoveInput => m_moveInput;
-    public bool SitInput => m_sitInput;
+    public bool MoveInput => m_moveInput > 0;
+    public bool SitInput => m_sitInput > 0;
 
 
     [SerializeField] private StaticHandGesture m_rightSitPoseGesture;
@@ -16,8 +14,8 @@ public class PlayerHandInput : MonoBehaviour
     [SerializeField] private StaticHandGesture m_leftSitPoseGesture;
     [SerializeField] private StaticHandGesture m_leftMovePoseGesture;
 
-    [SerializeField, Disable] private bool m_moveInput = false;
-    [SerializeField, Disable] private bool m_sitInput = false;
+    [SerializeField, Disable] private int m_moveInput = 0;
+    [SerializeField, Disable] private int m_sitInput = 0;
 
     private void Start()
     {
@@ -47,21 +45,21 @@ public class PlayerHandInput : MonoBehaviour
 
     private void OnSitPosePerformed()
     {
-        m_sitInput = true;
+        m_sitInput++;
     }
 
     private void OnMovePosePerformed()
     {
-        m_moveInput = true;
+        m_moveInput++;
     }
 
     private void OnSitPoseEnded()
     {
-        m_sitInput = false;
+        m_sitInput--;
     }
 
     private void OnMovePoseEnded()
     {
-        m_moveInput = false;
+        m_moveInput--;
     }
-} 
+}
